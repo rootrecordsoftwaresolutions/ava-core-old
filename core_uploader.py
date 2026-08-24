@@ -7,11 +7,13 @@ Maps and uploads all files from /home/ava-core to a GitHub repo in a single oper
 import os
 import json
 import base64
+import requests
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
 from datetime import datetime
 import subprocess
 import sys
+import argparse
 
 
 class CoreUploader:
@@ -94,8 +96,6 @@ class CoreUploader:
         Returns:
             True if successful, False otherwise
         """
-        import requests
-        
         url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/contents/{relative_path}"
         
         headers = {
@@ -110,25 +110,23 @@ class CoreUploader:
         }
         
         try:
-            response = requests.put(url, json=data, headers=headers)
+            response = requests.put(url, json=data, headers=headers, timeout=10)
             
             if response.status_code in [201, 200]:
                 return True
             else:
-                error_msg = f"Failed to upload {relative_path}: {response.status_code} - {response.text}"
+                error_msg = f"Failed to upload {relative_path}: {response.status_code}"
                 self.upload_stats["errors"].append(error_msg)
-                print(f"❌ {error_msg}")
                 return False
         
         except Exception as e:
             error_msg = f"Exception uploading {relative_path}: {e}"
             self.upload_stats["errors"].append(error_msg)
-            print(f"❌ {error_msg}")
             return False
     
     def upload_all_files(self, batch_size: int = 10) -> None:
         """
-        Upload all scanned files to GitHub.
+        Upload all scanned files to GitHub via API.
         
         Args:
             batch_size: Number of files to process before progress update
@@ -165,6 +163,9 @@ class CoreUploader:
             # Create temporary directory for cloning
             temp_dir = f"/tmp/github-{self.repo_name}-upload"
             
+            # Remove old temp dir if exists
+            subprocess.run(["rm", "-rf", temp_dir], check=False, capture_output=True)
+            
             # Clone repository
             print(f"Cloning repository...")
             clone_url = f"https://{self.github_token}@github.com/{self.repo_owner}/{self.repo_name}.git"
@@ -172,7 +173,7 @@ class CoreUploader:
             
             # Copy all files
             print(f"Copying files...")
-            subprocess.run(["cp", "-r", self.root_path + "/*", f"{temp_dir}/"], shell=True, check=False)
+            subprocess.run(f"cp -r {self.root_path}/* {temp_dir}/", shell=True, check=False)
             
             # Configure git
             os.chdir(temp_dir)
@@ -182,14 +183,17 @@ class CoreUploader:
             # Add and commit
             print(f"Committing changes...")
             subprocess.run(["git", "add", "-A"], check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", f"Initial upload of ava-core directory (${len(self.files_to_upload)} files)"], check=True, capture_output=True)
+            result = subprocess.run(["git", "commit", "-m", f"Initial upload of ava-core directory ({len(self.files_to_upload)} files)"], capture_output=True)
             
-            # Push
-            print(f"Pushing to GitHub...")
-            subprocess.run(["git", "push", "-u", "origin", "main"], check=True, capture_output=True)
-            
-            self.upload_stats["uploaded_files"] = len(self.files_to_upload)
-            print("✓ Upload complete!")
+            if result.returncode == 0:
+                # Push
+                print(f"Pushing to GitHub...")
+                subprocess.run(["git", "push", "-u", "origin", "master"], check=True, capture_output=True)
+                
+                self.upload_stats["uploaded_files"] = len(self.files_to_upload)
+                print("✓ Upload complete!")
+            else:
+                print("No changes to commit")
         
         except subprocess.CalledProcessError as e:
             print(f"Git command failed: {e}")
@@ -205,13 +209,13 @@ class CoreUploader:
             "source": self.root_path,
             "repository": f"{self.repo_owner}/{self.repo_name}",
             "statistics": self.upload_stats,
-            "files": [
+            "sample_files": [
                 {
                     "local_path": fp,
                     "repo_path": rp,
                     "size": os.path.getsize(fp) if os.path.exists(fp) else 0
                 }
-                for fp, rp in self.files_to_upload[:100]  # Sample first 100
+                for fp, rp in self.files_to_upload[:100]
             ]
         }
         
@@ -241,8 +245,6 @@ class CoreUploader:
 
 def main():
     """Main function."""
-    import argparse
-    
     parser = argparse.ArgumentParser(description="Core Uploader - Upload directory to GitHub")
     parser.add_argument("--owner", required=True, help="GitHub repository owner")
     parser.add_argument("--repo", required=True, help="GitHub repository name")
