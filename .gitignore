@@ -1,23 +1,23 @@
+# Ava ecosystem exclusions
+
+# User folders not part of the ecosystem repository
+[Ss]creenshots/
+[Pp]ictures/
+snap/
+Desktop/
+
+# Environment files and variants
 .env
 .env.*
-!.env.example
 **/.env
-**/node_modules/
-**/dist/
-**/build/
-**/.wrangler/
-**/.cache/
-**/__pycache__/
-*.pem
-*.key
-*credentials*
-*secret*
-**/data/billing/
-**/data/flight/
-**/data/ecoflow/
-**/data/*.db
-**/data/*.sqlite*
-**/*.log
-**/Server Handoffs/
-**/Server Live Backups/
-**/.tmp-gh-token
+**/.env.*
+
+# Keep safe example templates
+!.env.example
+!.env.*.example
+
+# Cloudflare credentials — never commit
+Web/cloudflare/**/*.token
+Web/cloudflare/**/*.pem
+Web/cloudflare/**/*.json
+Web/cloudflare/**/cert.pem
