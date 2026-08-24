@@ -8,6 +8,7 @@ import os
 import json
 import base64
 import requests
+import shutil
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
 from datetime import datetime
@@ -164,42 +165,67 @@ class CoreUploader:
             temp_dir = f"/tmp/github-{self.repo_name}-upload"
             
             # Remove old temp dir if exists
-            subprocess.run(["rm", "-rf", temp_dir], check=False, capture_output=True)
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
             
             # Clone repository
             print(f"Cloning repository...")
             clone_url = f"https://{self.github_token}@github.com/{self.repo_owner}/{self.repo_name}.git"
-            subprocess.run(["git", "clone", clone_url, temp_dir], check=True, capture_output=True)
+            result = subprocess.run(["git", "clone", clone_url, temp_dir], capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"Clone failed: {result.stderr}")
             
-            # Copy all files
-            print(f"Copying files...")
-            subprocess.run(f"cp -r {self.root_path}/* {temp_dir}/", shell=True, check=False)
+            # Copy all files using shutil
+            print(f"Copying files (this may take a while with 512k+ files)...")
+            for item in os.listdir(self.root_path):
+                src = os.path.join(self.root_path, item)
+                dst = os.path.join(temp_dir, item)
+                
+                # Skip .git and other repo files
+                if item.startswith('.git'):
+                    continue
+                
+                try:
+                    if os.path.isdir(src):
+                        if os.path.exists(dst):
+                            shutil.rmtree(dst)
+                        shutil.copytree(src, dst, ignore=shutil.ignore_patterns('.git*'))
+                    else:
+                        shutil.copy2(src, dst)
+                except Exception as e:
+                    print(f"Warning: Could not copy {item}: {e}")
             
             # Configure git
             os.chdir(temp_dir)
-            subprocess.run(["git", "config", "user.email", "uploader@ava-core.local"], check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.name", "Core Uploader"], check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "uploader@ava-core.local"], capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Core Uploader"], capture_output=True)
             
             # Add and commit
+            print(f"Adding files to git...")
+            subprocess.run(["git", "add", "-A"], capture_output=True)
+            
             print(f"Committing changes...")
-            subprocess.run(["git", "add", "-A"], check=True, capture_output=True)
-            result = subprocess.run(["git", "commit", "-m", f"Initial upload of ava-core directory ({len(self.files_to_upload)} files)"], capture_output=True)
+            result = subprocess.run(
+                ["git", "commit", "-m", f"Initial upload of ava-core directory ({self.upload_stats['total_files']} files)"],
+                capture_output=True,
+                text=True
+            )
             
             if result.returncode == 0:
                 # Push
-                print(f"Pushing to GitHub...")
-                subprocess.run(["git", "push", "-u", "origin", "master"], check=True, capture_output=True)
+                print(f"Pushing to GitHub (this may take several minutes)...")
+                push_result = subprocess.run(["git", "push", "-u", "origin", "master"], capture_output=True, text=True)
                 
-                self.upload_stats["uploaded_files"] = len(self.files_to_upload)
-                print("✓ Upload complete!")
+                if push_result.returncode == 0:
+                    self.upload_stats["uploaded_files"] = self.upload_stats["total_files"]
+                    print("✓ Upload complete!")
+                else:
+                    raise Exception(f"Push failed: {push_result.stderr}")
             else:
-                print("No changes to commit")
+                print(f"No changes or commit failed: {result.stderr}")
         
-        except subprocess.CalledProcessError as e:
-            print(f"Git command failed: {e}")
-            self.upload_stats["errors"].append(str(e))
         except Exception as e:
-            print(f"Error during git upload: {e}")
+            print(f"❌ Error during git upload: {e}")
             self.upload_stats["errors"].append(str(e))
     
     def generate_manifest(self, output_file: str = "MANIFEST.json") -> None:
