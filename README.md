@@ -1,42 +1,13 @@
-# Ava — Clean Build
+# ava-core-old
 
-Ava Ivy runtime for the HI Pacific Solar Root Server.
+> **Archive / older Ava Ivy line.** Canonical ops authority is the **org**.
 
-## Structure
+> **Authority:** [RootRecord-Software-Solutions](https://github.com/RootRecord-Software-Solutions)  
+> **Docs index:** [MIGRATION-DOCS-INDEX](https://github.com/RootRecord-Software-Solutions/RootRecord-Library/blob/main/Documentation/00-architecture/MIGRATION-DOCS-INDEX-2026-09-28.md)  
+> **Product / archive catalog:** [Product-Archive-Repo-Catalog](https://github.com/RootRecord-Software-Solutions/RootRecord-Library/blob/main/Documentation/00-architecture/Product-Archive-Repo-Catalog-2026-09-28.md)  
+> **Live Pacific:** [RootRecord-Pacific-Solar-Server](https://github.com/RootRecord-Software-Solutions/RootRecord-Pacific-Solar-Server)  
+> **Library:** [RootRecord-Library](https://github.com/RootRecord-Software-Solutions/RootRecord-Library)
 
-```
-ava/
-├── apps/core/          Python-primary FastAPI server (:8787)
-├── apps/voice/         Voice pipeline + Stream Director
-├── apps/desktop/       Electron desktop client (symlink to current)
-├── packages/workers/   Cloudflare Workers (TypeScript)
-├── packages/web/       Vercel frontends (Next.js)
-├── data/               Runtime data — gitignored
-├── scripts/            start.sh, install.sh, migrate.sh
-├── systemd/            Service units
-├── config/             cloudflared tunnel config
-└── docs/               Architecture notes
-```
+Older Ava Ivy + GEO discovery docs. Prefer current `ava-core` and org Pacific for live work.
 
-## Quick start
-
-```bash
-# One-time setup
-./scripts/install.sh
-
-# Start everything
-./scripts/start.sh
-
-# Start core only
-cd apps/core && uvicorn main:app --host 0.0.0.0 --port 8787 --reload
-```
-
-## Domains (new CF account)
-
-| Domain | Purpose |
-|---|---|
-| `rootmc.info` | Minecraft API |
-| `avaivy.cloud` | Ava API + public identity site |
-| `rootrecord.online` | Real-world ops API (Kīlauea, NWS, reports) |
-
-Cloudflare is proxy + fallback only. All scheduling and intelligence runs on this device.
+*Transition banner 2026-09-28 HST.*
